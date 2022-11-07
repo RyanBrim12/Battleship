@@ -106,8 +106,8 @@ def draw_grid(x_start, y_start, hits, misses, ships, show_ships):
 def get_coord(mouse_pos, grid_corner):
     mouse_x, mouse_y = mouse_pos
     grid_x, grid_y = grid_corner
-    if not (grid_x < mouse_x < grid_x + BOX_WIDTH * 11
-            and grid_y < mouse_y < grid_y + BOX_WIDTH * 11):
+    if not (grid_x + BOX_WIDTH < mouse_x < grid_x + BOX_WIDTH * 11
+            and grid_y + BOX_WIDTH< mouse_y < grid_y + BOX_WIDTH * 11):
         return None
     return ((mouse_x - grid_x) // BOX_WIDTH, (mouse_y - grid_y) // BOX_WIDTH)
 
