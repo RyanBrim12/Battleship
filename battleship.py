@@ -1,6 +1,7 @@
 import pygame
 import pygame.draw as draw
 import random
+import pygame.mouse as mouse
 
 BOX_WIDTH = 80
 BORDER = 50
@@ -75,14 +76,14 @@ def draw_grid(x_start, y_start, hits, misses, ships, show_ships):
 
             # Column labels
             if x == 0 and y != 0:
-                text = font.render(f'{y}', True, BLACK)
+                text = font_label.render(f'{y}', False, BLACK)
                 text_rect = text.get_rect(center=(y_corner + BOX_WIDTH / 2,
                                                   x_corner + BOX_WIDTH / 2))
                 screen.blit(text, text_rect)
 
             # Row labels
             if y == 0 and x != 0:
-                text = font.render(f'{chr(64 + x)}', True, BLACK)
+                text = font_label.render(f'{chr(64 + x)}', False, BLACK)
                 text_rect = text.get_rect(center=(y_corner + BOX_WIDTH / 2,
                                                   x_corner + BOX_WIDTH / 2))
                 screen.blit(text, text_rect)
@@ -119,13 +120,43 @@ def bot_move():
         selected_coord = shot_x, shot_y
         if selected_coord in p_hits + p_misses:
             continue
-        is_hit, hit_ship = check_hit(p_ships, selected_coord)
-        if is_hit:
-            p_hits.append(selected_coord)
-            hit_ship[1] -= 1
-        else:
-            p_misses.append(selected_coord)
         break
+    take_shot(selected_coord, p_ships, p_hits, p_misses)
+
+
+def take_shot(selected_coord_, ships, hits, misses):
+    msg = (f'You{"r opponent" * (ships == p_ships)} targetted '
+           f'({selected_coord_[0]}, {chr(64 + selected_coord_[1])}).')
+    is_hit, hit_ship = check_hit(ships, selected_coord_)
+    if is_hit:
+        hits.append(selected_coord_)
+        update_msgs(msgs, msg + ' It was a hit.', RED)
+        hit_ship[1] -= 1
+        if hit_ship[1] == 0:
+            msg = (f'You{"r opponent" * (ships == p_ships)} sunk '
+                   f'{"your" if ships == p_ships else "their"} {hit_ship[0]}!')
+            update_msgs(msgs, msg, RED)
+    else:
+        misses.append(selected_coord_)
+        update_msgs(msgs, msg + ' It was a miss.', BLACK)
+
+
+def update_msgs(msgs_, new_msg, msg_col):
+    for i, e in enumerate(msgs_[:0:-1]):
+        msgs_[-(1 + i)] = msgs_[-(1 + i) - 1]
+
+    msgs_[0] = font_msg.render(f'{new_msg}', False, msg_col)
+
+
+def check_gameover(ships):
+    for ship in ships:
+        if ship[1] != 0:
+            return False
+    if ships == p_ships:
+        update_msgs(msgs, 'Your opponent sunk all of your ships. You Lose!', RED)
+    else:
+        update_msgs(msgs, 'You sunk all of your opponents ships. You Win!', RED)
+    return True
 
 
 if __name__ == "__main__":
@@ -138,7 +169,10 @@ if __name__ == "__main__":
     op_board_pos = BORDER * 2 + BOX_WIDTH * 11, BORDER * 2 + BOX_WIDTH * 11
 
     pygame.font.init()
-    font = pygame.font.SysFont(None, BOX_WIDTH)
+    font_label = pygame.font.SysFont(None, BOX_WIDTH)
+    font_msg = pygame.font.SysFont(None, BOX_WIDTH * 3 // 4)
+
+    msgs = [None, None, None, None, None, None]
 
     p_ships = generate_ships()
     op_ships = generate_ships()
@@ -147,38 +181,39 @@ if __name__ == "__main__":
     p_misses = []
     op_hits = []
     op_misses = []
-    
+
     is_player_turn = random.choice((True, False))
 
+    is_gameover = False
+
     while True:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                exit()
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if is_player_turn:
-                    if pygame.mouse.get_pressed()[0]:
-                        selected_coord = get_coord(pygame.mouse.get_pos(),
-                                                   op_board_pos)
-                        if selected_coord not in op_hits + op_misses:
-                            if selected_coord:
-                                is_hit, hit_ship = check_hit(op_ships,
-                                                             selected_coord)
-                                if is_hit:
-                                    op_hits.append(selected_coord)
-                                    hit_ship[1] -= 1
-                                else:
-                                    op_misses.append(selected_coord)
-                                is_player_turn = not is_player_turn
+        if not is_gameover:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    if is_player_turn and mouse.get_pressed()[0]:
+                        selected_coord = get_coord(mouse.get_pos(), op_board_pos)
+                        if selected_coord not in op_hits + op_misses + [None]:
+                            print(is_gameover)
+                            take_shot(selected_coord, op_ships, op_hits, op_misses)
+                            is_player_turn = not is_player_turn
 
-        if not is_player_turn:
-            bot_move()
-            is_player_turn = not is_player_turn
 
+            if not is_player_turn:
+                bot_move()
+                is_player_turn = not is_player_turn
+
+            is_gameover = check_gameover(op_ships) or check_gameover(p_ships)
 
         screen.fill((109, 191, 219))
         draw_grid(p_board_pos[0], p_board_pos[1],
                   p_hits, p_misses, p_ships, True)
         draw_grid(op_board_pos[0], op_board_pos[1],
                   op_hits, op_misses, op_ships, False)
+        for i, e in enumerate(msgs):
+            if not e == None:
+                screen.blit(e, (op_board_pos[0], op_board_pos[1] - BOX_WIDTH * (1 + i)))
         pygame.display.flip()
+
