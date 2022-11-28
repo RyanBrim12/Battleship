@@ -143,7 +143,7 @@ def take_shot(selected_coord_, ships, hits, misses):
 
 def update_msgs(msgs_, new_msg, msg_col):
     for i, e in enumerate(msgs_[:0:-1]):
-        msgs_[-(1 + i)] = msgs_[-(1 + i) - 1]
+        msgs_[-1 - i] = msgs_[-2 - i]
 
     msgs_[0] = font_msg.render(f'{new_msg}', False, msg_col)
 
@@ -170,7 +170,8 @@ if __name__ == "__main__":
 
     pygame.font.init()
     font_label = pygame.font.SysFont(None, BOX_WIDTH)
-    font_msg = pygame.font.SysFont(None, BOX_WIDTH * 3 // 4)
+    font_msg = pygame.font.SysFont(None, BOX_WIDTH * 5 // 8)
+    font_restart = pygame.font.SysFont(None, BOX_WIDTH * 2)
 
     msgs = [None, None, None, None, None, None]
 
@@ -187,7 +188,20 @@ if __name__ == "__main__":
     is_gameover = False
 
     while True:
+        screen.fill((109, 191, 219))
+        draw_grid(p_board_pos[0], p_board_pos[1],
+                  p_hits, p_misses, p_ships, True)
+        draw_grid(op_board_pos[0], op_board_pos[1],
+                  op_hits, op_misses, op_ships, False)
+        for i, e in enumerate(msgs):
+            if e != None:
+                screen.blit(e, (op_board_pos[0], op_board_pos[1] - BOX_WIDTH * (1 + i)))
+        
         if not is_gameover:
+            if not is_player_turn:
+                bot_move()
+                is_player_turn = not is_player_turn
+            
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
@@ -196,24 +210,37 @@ if __name__ == "__main__":
                     if is_player_turn and mouse.get_pressed()[0]:
                         selected_coord = get_coord(mouse.get_pos(), op_board_pos)
                         if selected_coord not in op_hits + op_misses + [None]:
-                            print(is_gameover)
                             take_shot(selected_coord, op_ships, op_hits, op_misses)
                             is_player_turn = not is_player_turn
 
-
-            if not is_player_turn:
-                bot_move()
-                is_player_turn = not is_player_turn
-
             is_gameover = check_gameover(op_ships) or check_gameover(p_ships)
+        else:
+            restart_rect = pygame.Rect(203, 1316, 575, 115)
+            draw.rect(screen, LIGHT_GRAY, restart_rect)
+            restart_button = font_restart.render('Play Again', False, BLACK)
+            button_rect = restart_button.get_rect(center=(p_board_pos[0] + BOX_WIDTH * 11 // 2,
+                                                          p_board_pos[1] + BOX_WIDTH * 33 // 2))
+            screen.blit(restart_button, button_rect)
+            
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    exit()
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    print(mouse.get_pos())
+                    if button_rect.collidepoint(mouse.get_pos()):
+                        msgs = [None, None, None, None, None, None]
 
-        screen.fill((109, 191, 219))
-        draw_grid(p_board_pos[0], p_board_pos[1],
-                  p_hits, p_misses, p_ships, True)
-        draw_grid(op_board_pos[0], op_board_pos[1],
-                  op_hits, op_misses, op_ships, False)
-        for i, e in enumerate(msgs):
-            if not e == None:
-                screen.blit(e, (op_board_pos[0], op_board_pos[1] - BOX_WIDTH * (1 + i)))
+                        p_ships = generate_ships()
+                        op_ships = generate_ships()
+
+                        p_hits = []
+                        p_misses = []
+                        op_hits = []
+                        op_misses = []
+
+                        is_player_turn = random.choice((True, False))
+
+                        is_gameover = False
+                
         pygame.display.flip()
-
