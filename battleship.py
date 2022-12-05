@@ -30,9 +30,9 @@ def pick_ship_coords(ship_len, ships):
         if check_hit(ships, (x_start, y_start))[0]:
             continue
         coords.append((x_start, y_start))
-        dir = random.choice([(1, 0), (-1, 0), (0, 1), (0, -1)])
+        direction = random.choice([(1, 0), (-1, 0), (0, 1), (0, -1)])
         for _ in range(1, ship_len):
-            coord = coords[-1][0] + dir[0], coords[-1][1] + dir[1]
+            coord = coords[-1][0] + direction[0], coords[-1][1] + direction[1]
             if (coord[0] > 10 or coord[0] < 1
                 or coord[1] > 10 or coord[1] < 1
                 or check_hit(ships, coord)[0]):
