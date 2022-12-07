@@ -2,6 +2,7 @@ import pygame
 import pygame.draw as draw
 import random
 import pygame.mouse as mouse
+from ship import Ship
 
 BOX_WIDTH = 80
 BORDER = 50
@@ -14,41 +15,14 @@ LIGHT_GRAY = (200, 200, 200)
 
 def generate_ships():
     ships = []
-    ships.append(['Carrier', 5, pick_ship_coords(5, ships)])
-    ships.append(['Battleship', 4, pick_ship_coords(4, ships)])
-    ships.append(['Destroyer', 3, pick_ship_coords(3, ships)])
-    ships.append(['Submarine', 3, pick_ship_coords(3, ships)])
-    ships.append(['Patrol Boat', 2, pick_ship_coords(2, ships)])
-    return ships
-
-
-def pick_ship_coords(ship_len, ships):
-    while True:
-        coords = []
-        x_start = random.choice(range(1, 11))
-        y_start = random.choice(range(1, 11))
-        if check_hit(ships, (x_start, y_start))[0]:
-            continue
-        coords.append((x_start, y_start))
-        direction = random.choice([(1, 0), (-1, 0), (0, 1), (0, -1)])
-        for _ in range(1, ship_len):
-            coord = coords[-1][0] + direction[0], coords[-1][1] + direction[1]
-            if (coord[0] > 10 or coord[0] < 1
-                or coord[1] > 10 or coord[1] < 1
-                or check_hit(ships, coord)[0]):
-                break
-            coords.append(coord)
-        if len(coords) == ship_len:
-            return coords
-
-
-def check_hit(ships, shot_coord):
+    ships.append(Ship('Carrier', 5))
+    ships.append(Ship('Battleship', 4))
+    ships.append(Ship('Destroyer', 3))
+    ships.append(Ship('Submarine', 3))
+    ships.append(Ship('Patrol Boat', 2))
     for ship in ships:
-        if ship[1] > 0:
-            for ship_coord in ship[2]:
-                if ship_coord == shot_coord:
-                    return (True, ship)
-    return (False, None)
+        ship.pick_ship_coords(ships)
+    return ships
 
 
 def draw_shots(x_start_, y_start_, shots, color):
@@ -89,12 +63,12 @@ def draw_grid(x_start, y_start, hits, misses, ships, show_ships):
                 screen.blit(text, text_rect)
 
     for ship in ships:
-        for coord in ship[2]:
+        for coord in ship.coords:
             x, y = coord
             x_corner = x_start + BOX_WIDTH * x
             y_corner = y_start + BOX_WIDTH * y
             rect = pygame.Rect(x_corner, y_corner, BOX_WIDTH, BOX_WIDTH)
-            if ship[1]:
+            if ship.num_parts_left:
                 if show_ships:
                     draw.rect(screen, LIGHT_GRAY, rect)
             else:
@@ -127,14 +101,14 @@ def bot_move():
 def take_shot(selected_coord_, ships, hits, misses):
     msg = (f'You{"r opponent" * (ships == p_ships)} targetted '
            f'({selected_coord_[0]}, {chr(64 + selected_coord_[1])}).')
-    is_hit, hit_ship = check_hit(ships, selected_coord_)
+    is_hit, hit_ship = Ship.check_hit(ships, selected_coord_)
     if is_hit:
         hits.append(selected_coord_)
         update_msgs(msgs, msg + ' It was a hit.', RED)
-        hit_ship[1] -= 1
-        if hit_ship[1] == 0:
+        hit_ship.num_parts_left -= 1
+        if hit_ship.num_parts_left == 0:
             msg = (f'You{"r opponent" * (ships == p_ships)} sunk '
-                   f'{"your" if ships == p_ships else "their"} {hit_ship[0]}!')
+                   f'{"your" if ships == p_ships else "their"} {hit_ship.name}!')
             update_msgs(msgs, msg, RED)
     else:
         misses.append(selected_coord_)
@@ -150,7 +124,7 @@ def update_msgs(msgs_, new_msg, msg_col):
 
 def check_gameover(ships):
     for ship in ships:
-        if ship[1] != 0:
+        if ship.num_parts_left != 0:
             return False
     if ships == p_ships:
         update_msgs(msgs, 'Your opponent sunk all of your ships. You Lose!', RED)
