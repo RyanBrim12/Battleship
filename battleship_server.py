@@ -87,27 +87,25 @@ class Battleship:
             self.display_board()
             if self.is_player_turn:
                 for event in pygame.event.get():
-                    print(event.type)
                     if event.type == pygame.QUIT:
                         pygame.quit()
                         exit()
                     elif event.type == pygame.MOUSEBUTTONDOWN:
                         if mouse.get_pressed()[0]:
                             selected_coord = self.get_coord(mouse.get_pos(), self.op_board_pos)
-                            print('selected_coord')
                             if selected_coord not in self.op_hits + self.op_misses + [None]:
                                 self.take_shot(selected_coord, self.op_ships, self.op_hits, self.op_misses)
                                 self.is_player_turn = not self.is_player_turn
                                 client.send(pickle.dumps(selected_coord))
             else:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        pygame.quit()
+                        exit()
                 data = client.recv(1024)
                 if not data:
                     break
                 else:
-                    for event in pygame.event.get():
-                        if event.type == pygame.QUIT:
-                            pygame.quit()
-                            exit()
                     self.take_shot(pickle.loads(data), self.p_ships, self.p_hits, self.p_misses)
                     self.is_player_turn = not self.is_player_turn
         client.close()
@@ -225,4 +223,4 @@ class Battleship:
                 
 if __name__ == '__main__':
     game = Battleship()
-    game.host_game("localhost", 9999)
+    game.host_game("localhost", 2345)
