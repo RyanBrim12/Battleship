@@ -1,3 +1,5 @@
+"""Play games of battleship against a bot or another player."""
+
 import random
 import socket
 import selectors
@@ -5,7 +7,6 @@ import pickle
 import pygame
 import pygame.draw as draw
 import pygame.mouse as mouse
-from ship import Ship
 
 BOX_WIDTH = 25
 BORDER = 10
@@ -19,6 +20,7 @@ LIGHT_GRAY = (200, 200, 200)
 class Battleship:
 
     def __init__(self, screen):
+        """Set all values to defaults."""
         self.screen = screen
         self.p_board_pos = BORDER, BORDER
         self.op_board_pos = (BORDER * 2 + BOX_WIDTH * 11,
@@ -44,6 +46,7 @@ class Battleship:
         self.bot_next_targets = []
 
     def host_game(self, host, port):
+        """Create server for other player to connect and start game."""
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.bind((host, port))
         server.listen(1)
@@ -75,22 +78,24 @@ class Battleship:
         self.op_ships = self.generate_ships()
         self.p_turn = random.choice((True, False))
 
-        data_array = []
+        data_array = []  # Sends random ship positions and starting turn
         for ship in self.p_ships + self.op_ships:
             data_array.append(pickle.dumps(ship))
         data_array.append(pickle.dumps(not self.p_turn))
         client.send(pickle.dumps(data_array))
-        self.handle_connection(client, sel, False)
+
+        self.play_game(client, sel, False)
         server.close()
 
     def connect_to_game(self, host, port):
+        """Connect to server other player has created."""
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client.connect((host, port))
         sel = selectors.DefaultSelector()
         sel.register(client, selectors.EVENT_READ | selectors.EVENT_WRITE)
 
         all_data_recieved = False
-        while not all_data_recieved:
+        while not all_data_recieved:  # Reads random ship positions and turn
             data_array = pickle.loads(client.recv(5000))
             for d in data_array:
                 if len(self.op_ships) < 5:
@@ -100,18 +105,32 @@ class Battleship:
                 else:
                     self.p_turn = bool(pickle.loads(d))
                     all_data_recieved = True
-        self.handle_connection(client, sel, False)
+
+        self.play_game(client, sel, False)
 
     def start_bot_game(self):
+        """Start battleship game against a bot"""
         self.p_ships = self.generate_ships()
         self.op_ships = self.generate_ships()
         self.p_turn = random.choice((True, False))
-        if not self.p_turn:
+        if not self.p_turn:  # Bot makes a move if it is its turn first
             self.bot_move()
             self.p_turn = True
-        self.handle_connection(None, None, True)
 
-    def handle_connection(self, client, sel, against_bot):
+        self.play_game(None, None, True)
+
+    def play_game(self, client, sel, against_bot):
+        """
+        Alternate player turns. After game display board.
+
+        During the game, if it is the players turn, take input from
+        player and make their move then send it to the other player.
+        If it is not the players turn, recieve the others player
+        move and save it.
+        
+        After the game, display the board and a button to return to
+        the starting menu.
+        """
         while not self.game_over:
             self.game_over = (self.check_gameover(self.p_ships)
                               or self.check_gameover(self.op_ships))
@@ -151,10 +170,11 @@ class Battleship:
                             self.p_turn = not self.p_turn
                 if no_data:
                     break
-        if not against_bot:
+        if not against_bot:  # Closes socket connection if playing multiplayer
             client.close()
+
         see_board = True
-        while see_board:
+        while see_board:  # Showing board after game and back to menu button
             restart_rect = pygame.Rect(35, 400, 225, 40)
             draw.rect(screen, LIGHT_GRAY, restart_rect)
             restart_button = font_btn.render('Back to menu', False, BLACK)
@@ -174,6 +194,7 @@ class Battleship:
 
     @staticmethod
     def get_coord(mouse_pos, grid_corner):
+        """Return the coordinate associated with the mouse position."""
         mouse_x, mouse_y = mouse_pos
         grid_x, grid_y = grid_corner
         if not (grid_x + BOX_WIDTH < mouse_x < grid_x + BOX_WIDTH * 11
@@ -183,6 +204,7 @@ class Battleship:
                 (mouse_y - grid_y) // BOX_WIDTH)
 
     def take_shot(self, selected_coord_, ships, hits, misses):
+        """Return if the shot is a hit or miss."""
         msg = (f'You{"r opponent" * (ships == self.p_ships)} targetted '
                f'({selected_coord_[0]}, {chr(64 + selected_coord_[1])}).')
         is_hit, hit_ship = Ship.check_hit(ships, selected_coord_)
@@ -202,12 +224,14 @@ class Battleship:
             return False
 
     def update_msgs(self, msgs_, new_msg, msg_col):
+        """Add a new message to msgs."""
         for i, e in enumerate(msgs_[:0:-1]):
             msgs_[-1 - i] = msgs_[-2 - i]
 
         msgs_[0] = self.font_msg.render(f'{new_msg}', False, msg_col)
 
     def generate_ships(self):
+        """Randomly generate ship placements for a player."""
         ships = []
         ships.append(Ship('Carrier', 5))
         ships.append(Ship('Battleship', 4))
@@ -219,6 +243,7 @@ class Battleship:
         return ships
 
     def display_board(self):
+        """Display the battleship grids and messages."""
         self.screen.fill((109, 191, 219))
         self.draw_grid(self.p_board_pos[0], self.p_board_pos[1],
                   self.p_hits, self.p_misses, self.p_ships, True)
@@ -236,6 +261,7 @@ class Battleship:
         pygame.display.flip()
 
     def draw_shots(self, x_start_, y_start_, shots, color):
+        """Draw X's at the given coordinates in the given color."""
         for coord in shots:
             x_coord, y_coord = coord
             x_corner = x_start_ + BOX_WIDTH * x_coord
@@ -251,6 +277,7 @@ class Battleship:
                       width=1)
 
     def draw_grid(self, x_start, y_start, hits, misses, ships, show_ships):
+        """Draw a battleship grid with collumn and row labels."""
         for x in range(11):
             for y in range(11):
                 x_corner = x_start + BOX_WIDTH * x
@@ -258,16 +285,14 @@ class Battleship:
                 rect = pygame.Rect(x_corner, y_corner, BOX_WIDTH, BOX_WIDTH)
                 draw.rect(self.screen, BLACK, rect, width=2)
 
-                # Column labels
-                if x == 0 and y != 0:
+                if x == 0 and y != 0:  # Column labels
                     text = self.font_label.render(f'{y}', False, BLACK)
                     text_rect = text.get_rect(
                          center=(y_corner + BOX_WIDTH / 2,
                                  x_corner + BOX_WIDTH / 2))
                     self.screen.blit(text, text_rect)
 
-                # Row labels
-                if y == 0 and x != 0:
+                if y == 0 and x != 0:  # Row labels
                     text = self.font_label.render(f'{chr(64 + x)}',
                                                   False, BLACK)
                     text_rect = text.get_rect(
@@ -291,6 +316,7 @@ class Battleship:
         self.draw_shots(x_start, y_start, misses, BLACK)
 
     def check_gameover(self, ships):
+        """Return if all of a players ships are sunk."""
         for ship in ships:
             if ship.num_parts_left != 0:
                 return False
@@ -306,6 +332,7 @@ class Battleship:
         return True
 
     def bot_move(self):
+        """Choose the coord for the bots shot and take the shot."""
         while True:
             if self.bot_next_targets:
                 shot_x, shot_y = self.bot_next_targets.pop()
@@ -325,6 +352,44 @@ class Battleship:
                         coord[0] > 0 and coord[0] < 11 and
                         coord[1] > 0 and coord[1] < 11):
                     self.bot_next_targets.append(coord)
+
+
+class Ship:
+
+    def __init__(self, name, ship_len):
+        self.name = name
+        self.num_parts_left = ship_len
+        self.coords = []
+
+    def pick_ship_coords(self, ships):
+        while True:
+            coords = []
+            x_start = random.choice(range(1, 11))
+            y_start = random.choice(range(1, 11))
+            if self.check_hit(ships, (x_start, y_start))[0]:
+                continue
+            coords.append((x_start, y_start))
+            direction = random.choice([(1, 0), (-1, 0), (0, 1), (0, -1)])
+            for _ in range(1, self.num_parts_left):
+                coord = (coords[-1][0] + direction[0],
+                         coords[-1][1] + direction[1])
+                if (coord[0] > 10 or coord[0] < 1
+                        or coord[1] > 10 or coord[1] < 1
+                        or self.check_hit(ships, coord)[0]):
+                    break
+                coords.append(coord)
+            if len(coords) == self.num_parts_left:
+                self.coords = coords
+                break
+
+    @staticmethod
+    def check_hit(ships, shot_coord):
+        for ship in ships:
+            if ship.num_parts_left > 0:
+                for ship_coord in ship.coords:
+                    if ship_coord == shot_coord:
+                        return (True, ship)
+        return (False, None)
 
 
 if __name__ == '__main__':
@@ -370,6 +435,9 @@ if __name__ == '__main__':
                     game = Battleship(screen)
                     game.host_game('localhost', 2345)
                 elif join_button_rect.collidepoint(mouse.get_pos()):
-                    game = Battleship(screen)
-                    game.connect_to_game('localhost', 2345)
+                    try:
+                        game = Battleship(screen)
+                        game.connect_to_game('localhost', 2345)
+                    except ConnectionRefusedError:
+                        print("Game needs to be hosted first")
 
